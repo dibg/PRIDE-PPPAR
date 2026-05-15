@@ -44,8 +44,30 @@ real*8    t,lat,lon,xpole,ypole,sidtm,rot_f2j(3,3),rot_l2f(3,3),olc(11,6)
 integer*4 i,j,jdutc,jdtdt,iy,imon,id,ih,im
 real*8    tsec,fhr,xpm,ypm,tutc,ttdt,dxi(3),colat,xs(3),xl(3)
 !
+!! single-slot memoization cache (process-local, not thread-safe).
+!! tide_displace is called 6x per epoch with identical (jd,t) -- once from each
+!! constellation routine. All inputs are deterministic in (jd,t) plus the
+!! station (lat,lon,olc,otlfil) and run config (tide), so 5 of 6 calls reuse.
+logical*1     cache_valid
+integer*4     cache_jd
+real*8        cache_t,cache_lat,cache_lon,cache_disp(3),cache_olc(11,6)
+character*256 cache_tide,cache_otlfil
+save          cache_valid,cache_jd,cache_t,cache_lat,cache_lon,cache_disp
+save          cache_tide,cache_otlfil,cache_olc
+data          cache_valid/.false./
+!
 !! function called
 real*8    dot,taiutc
+!
+!! return cached result if the request matches the last computed epoch
+if (cache_valid .and. jd .eq. cache_jd .and. t .eq. cache_t &
+    .and. lat .eq. cache_lat .and. lon .eq. cache_lon &
+    .and. all(olc .eq. cache_olc) &
+    .and. trim(tide) .eq. trim(cache_tide) &
+    .and. trim(otlfil) .eq. trim(cache_otlfil)) then
+  disp(1:3) = cache_disp(1:3)
+  return
+endif
 !
 !! initialization
 do i=1,3
@@ -102,6 +124,17 @@ if(index(tide,'OCEAN').ne.0) then
     disp(i)=disp(i)+dxi(i)*1.d-3
   enddo
 endif
+!
+!! store result for reuse by the remaining constellation calls this epoch
+cache_jd     = jd
+cache_t      = t
+cache_lat    = lat
+cache_lon    = lon
+cache_tide   = tide
+cache_otlfil = otlfil
+cache_olc    = olc
+cache_disp(1:3) = disp(1:3)
+cache_valid  = .true.
 
 return
 end

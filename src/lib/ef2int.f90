@@ -42,9 +42,33 @@ real*8    sod_tdt,sod_ut1,dpsi,deps
 real*8    xhelp(2),taiut1r,dut1_tide,dut1_libr,dut1,dlod,domega,dels,eop(3),pm_libr(2)
 real*8    rbpn(3,3),reot(3,3),rpom(3,3)
 !
+!! single-slot memoization cache (process-local, not thread-safe).
+!! ef2int is called 6x per epoch with identical (jd,sod) -- once from each
+!! constellation routine (gpsmod/glomod/galmod/bd2mod/bd3mod/qzsmod). All
+!! outputs depend only on (erpfil,jd,sod), so 5 of every 6 calls are reused.
+logical*1     cache_valid
+integer*4     cache_jd
+real*8        cache_sod,cache_gast,cache_xpole,cache_ypole
+real*8        cache_mate2j(3,3),cache_rmte2j(3,3)
+character*256 cache_erpfil
+save          cache_valid,cache_jd,cache_sod,cache_gast,cache_xpole,cache_ypole
+save          cache_mate2j,cache_rmte2j,cache_erpfil
+data          cache_valid/.false./
+!
 !! fuction called
 real*8    iau_GST06,iau_SP00
 
+!
+!! return cached result if the request matches the last computed epoch
+if (cache_valid .and. jd .eq. cache_jd .and. sod .eq. cache_sod &
+    .and. trim(erpfil) .eq. trim(cache_erpfil)) then
+  mate2j = cache_mate2j
+  rmte2j = cache_rmte2j
+  gast   = cache_gast
+  xpole  = cache_xpole
+  ypole  = cache_ypole
+  return
+endif
 !
 !! time second to arc radian
 call timinc(jd,sod,GPSTDT,jd_tdt,sod_tdt)
@@ -93,6 +117,17 @@ call iau_POM00(xpole/3600.d0/180.d0*pi,ypole/3600.d0/180.d0*pi,dels,rpom)
 call iau_C2TEQX(rbpn,gast,rpom,domega,mate2j,rmte2j)
 call iau_TR(mate2j,mate2j)
 call iau_TR(rmte2j,rmte2j)
+!
+!! store result for reuse by the remaining constellation calls this epoch
+cache_jd     = jd
+cache_sod    = sod
+cache_erpfil = erpfil
+cache_mate2j = mate2j
+cache_rmte2j = rmte2j
+cache_gast   = gast
+cache_xpole  = xpole
+cache_ypole  = ypole
+cache_valid  = .true.
 
 return
 end
