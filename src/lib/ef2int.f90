@@ -60,14 +60,18 @@ real*8    iau_GST06,iau_SP00
 
 !
 !! return cached result if the request matches the last computed epoch
-if (cache_valid .and. jd .eq. cache_jd .and. sod .eq. cache_sod &
-    .and. trim(erpfil) .eq. trim(cache_erpfil)) then
-  mate2j = cache_mate2j
-  rmte2j = cache_rmte2j
-  gast   = cache_gast
-  xpole  = cache_xpole
-  ypole  = cache_ypole
-  return
+!! (the key test is nested so the cache fields are never read before
+!! the first call has populated them)
+if (cache_valid) then
+  if (jd .eq. cache_jd .and. sod .eq. cache_sod &
+      .and. trim(erpfil) .eq. trim(cache_erpfil)) then
+    mate2j = cache_mate2j
+    rmte2j = cache_rmte2j
+    gast   = cache_gast
+    xpole  = cache_xpole
+    ypole  = cache_ypole
+    return
+  endif
 endif
 !
 !! time second to arc radian

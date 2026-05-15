@@ -60,13 +60,17 @@ data          cache_valid/.false./
 real*8    dot,taiutc
 !
 !! return cached result if the request matches the last computed epoch
-if (cache_valid .and. jd .eq. cache_jd .and. t .eq. cache_t &
-    .and. lat .eq. cache_lat .and. lon .eq. cache_lon &
-    .and. all(olc .eq. cache_olc) &
-    .and. trim(tide) .eq. trim(cache_tide) &
-    .and. trim(otlfil) .eq. trim(cache_otlfil)) then
-  disp(1:3) = cache_disp(1:3)
-  return
+!! (the key test is nested so the cache fields are never read before
+!! the first call has populated them)
+if (cache_valid) then
+  if (jd .eq. cache_jd .and. t .eq. cache_t &
+      .and. lat .eq. cache_lat .and. lon .eq. cache_lon &
+      .and. all(olc .eq. cache_olc) &
+      .and. trim(tide) .eq. trim(cache_tide) &
+      .and. trim(otlfil) .eq. trim(cache_otlfil)) then
+    disp(1:3) = cache_disp(1:3)
+    return
+  endif
 endif
 !
 !! initialization

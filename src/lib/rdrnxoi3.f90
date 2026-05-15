@@ -72,6 +72,7 @@ subroutine rdrnxoi3(lfn, jd0, sod0, dwnd, nprn0, prn0, HD, OB, bias, nbias_used,
   integer*4     best_index              !! GPS: W, GLONASS: P, Galileo: X, BDS: I, QZSS: L
   integer*4     prio_index
   integer*4     ityp, imes
+  logical*1     lno_bias
   character*512 string
   character*3   hobstyp(MAXTYP)         !! HD%obstyp3
   character*2   mes_type_sys(4)         !! Measurement type (L/C) + Frequency number(1-9)
@@ -274,8 +275,13 @@ subroutine rdrnxoi3(lfn, jd0, sod0, dwnd, nprn0, prn0, HD, OB, bias, nbias_used,
         end if
         !
         !! correct raw observations
-        if ((.not. allocated(bias(i0, ityp)%val)) .or. &
-            (abs(bias(i0, ityp)%val(iepo) - 1.d9) .lt. 1.d-3)) then
+        !! test the sentinel value only when %val is allocated -- Fortran .or.
+        !! is not short-circuiting, so the combined test would otherwise
+        !! dereference an unallocated array
+        lno_bias = .not. allocated(bias(i0, ityp)%val)
+        if (.not. lno_bias) &
+          lno_bias = abs(bias(i0, ityp)%val(iepo) - 1.d9) .lt. 1.d-3
+        if (lno_bias) then
           if (phs_prio_index(imes) .lt. prio_index) then
             obs_used_index(imes) = j
             phs_prio_index(imes) = prio_index
