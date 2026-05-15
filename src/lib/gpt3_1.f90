@@ -145,7 +145,22 @@ data lfirst/.true./
 save lfirst,gm,dMtr,Rg,pi
 save pgrid,Tgrid,Qgrid,dTgrid,u,Hs,lagrid,Tmgrid
 
-if(lfirst) then
+! validate inputs (issue #56) before any grid access: a non-finite or
+! out-of-range coordinate would otherwise fall through to the nearest-
+! neighbour branch, produce a garbage grid index, and segfault at u(ix).
+pi = 3.1415926535d0
+if(isnan(dlat) .or. isnan(dlon) .or. isnan(hell)) then
+  write(*,'(a)') '***ERROR(gpt3_1): non-finite station coordinate'
+  call exit(1)
+endif
+if(dlat.lt.-pi/2.d0 .or. dlat.gt.pi/2.d0 .or. dlon.lt.-pi .or. dlon.gt.2.d0*pi) then
+  write(*,'(a,2f14.6)') '***ERROR(gpt3_1): station coordinate out of range, dlat,dlon=', dlat, dlon
+  call exit(1)
+endif
+
+! (re)load the grid on first use, or whenever the cached arrays have been
+! released by clean_gpt3_1 -- guards against re-entry after cleanup (issue #56)
+if(lfirst .or. .not.allocated(u)) then
   lfirst=.false.
   !% mean gravity in m/s**2
   gm = 9.80665d0;
@@ -459,5 +474,7 @@ Entry clean_gpt3_1()
   if (allocated(Hs)) deallocate(Hs)
   if (allocated(lagrid)) deallocate(lagrid)
   if (allocated(Tmgrid)) deallocate(Tmgrid)
+  !! force the grid to be reloaded if gpt3_1 is called again (issue #56)
+  lfirst = .true.
 
 end subroutine
