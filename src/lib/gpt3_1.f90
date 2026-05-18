@@ -298,6 +298,13 @@ if(ilon.eq.0) then
   ilon = 360
 endif
 
+!% clamp the row/column into the valid grid range (issue #56). The input
+!% validation above already rejects out-of-range coordinates, so for valid
+!% input this is a no-op; it is a defensive guard so that a future code
+!% path producing an out-of-range index cannot reach an out-of-bounds read.
+ipod = max(1, min(180, ipod))     !% polar rows are clamped, not wrapped
+ilon = modulo(ilon - 1, 360) + 1  !% longitude columns wrap into [1,360]
+
 !% get the number of the corresponding line
 indx(1) = (ipod - 1)*360 + ilon
 
@@ -312,7 +319,17 @@ endif
 if(ibilinear.eq.0) then
 
   ix = indx(1);
-        
+
+  !% final bounds check before the grid read (issue #56): abort with a
+  !% diagnostic that names the offending index and input coordinate
+  !% instead of letting an out-of-range ix segfault inside u(ix).
+  if(ix.lt.1 .or. ix.gt.64800) then
+    write(*,'(a)') '***ERROR(gpt3_1): grid index out of range (nearest-neighbour)'
+    write(*,'(a,i9,a,2i6,a,2f16.8)') &
+      '  ix=',ix,'  ipod,ilon=',ipod,ilon,'  dlat,dlon=',dlat,dlon
+    call exit(1)
+  endif
+
   !% transforming ellipsoidal height to orthometric height
   undu = u(ix)
   hgt = hell-undu
@@ -366,13 +383,29 @@ else !% ibilinear interpolation
     ilon1 = 360
   endif
 
+  !% clamp ipod1/ilon1 the same way (issue #56): the step ipod +/- 1 near a
+  !% pole can land on row 0 or 181, which the original code left unguarded.
+  ipod1 = max(1, min(180, ipod1))
+  ilon1 = modulo(ilon1 - 1, 360) + 1
+
   !% get the number of the line
   indx(2) = (ipod1 - 1)*360 + ilon   !% along same longitude
   indx(3) = (ipod  - 1)*360 + ilon1  !% along same polar distance
   indx(4) = (ipod1 - 1)*360 + ilon1  !% diagonal
 
   do l = 1,4
-      
+
+    !% final bounds check before the grid read (issue #56): abort with a
+    !% diagnostic naming the offending corner index and input coordinate
+    !% instead of letting an out-of-range indx(l) segfault inside u().
+    if(indx(l).lt.1 .or. indx(l).gt.64800) then
+      write(*,'(a,i2,a)') '***ERROR(gpt3_1): grid index out of range (ibilinear, corner ',l,')'
+      write(*,'(a,i9,a,4i6,a,2f16.8)') &
+        '  indx=',indx(l),'  ipod,ipod1,ilon,ilon1=',ipod,ipod1,ilon,ilon1, &
+        '  dlat,dlon=',dlat,dlon
+      call exit(1)
+    endif
+
     !% transforming ellipsoidal height to orthometric height:
     !% Hortho = -N + Hell
     undul(l) = u(indx(l))
