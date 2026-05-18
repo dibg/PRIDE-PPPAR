@@ -246,7 +246,7 @@ if(1.d0-t1%sec<0.5d0/(10.d0**n1))then
     t1%time=t1%time+1; t1%sec=0.d0
 endif
 call time2epoch(t1,ep)
-write(f6,"(I2'.'I2)") icond(n1<=0,2,n1+3),icond(n1<=0,0,n1)
+write(f6,"(I2,'.',I2)") icond(n1<=0,2,n1+3),icond(n1<=0,0,n1)
 fmtstr="(I4.4'/'I2.2'/'I2.2' 'I2.2':'I2.2':'f"//trim(f6)//")"
 write(s,fmtstr) int(ep(1:5)),ep(6)
 end subroutine

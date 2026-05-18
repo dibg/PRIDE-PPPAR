@@ -36,7 +36,7 @@ tss=allsol_(1)%time0
 tee=allsol_(solindex_)%time0
 call time2epoch(tss, epss)
 timespan=timediff(tee, tss)
-write(unit=6,fmt="(A11,I4.4,' ',I2.2,' ',I2.2,' ',I2.2,' ',I2.2,' ',F5.2,' 'F11.2)") &
+write(unit=6,fmt="(A11,I4.4,' ',I2.2,' ',I2.2,' ',I2.2,' ',I2.2,' ',F5.2,' ',F11.2)") &
         "Duration : ", int(epss(1)), int(epss(2)), int(epss(3)), &
                         int(epss(4)), int(epss(5)), epss(6), timespan  !, round(timespan)
 ! endif

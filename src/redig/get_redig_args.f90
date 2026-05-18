@@ -179,7 +179,7 @@ subroutine get_redig_args(nepo, RCF)
   jday = 0
 
   i = index(resfil, 'res_')
-  read (resfil(i:), '(4xi4i3)', err=200) jy, jdoy
+  read (resfil(i:), '(4x,i4,i3)', err=200) jy, jdoy
   call yeardoy2monthday(jy, jdoy, jmon, jday)
 
 200 continue

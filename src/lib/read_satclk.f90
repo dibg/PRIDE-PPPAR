@@ -41,7 +41,7 @@ subroutine read_satclk(clkfil, iprn, jd, sod, jdc, sodc, x0, x1, iflag)
   character*(*) clkfil
 !
 !! local
-  logical*1 lopened
+  logical*1 lopened, ladvance
   integer*4 i, j, k, lfn, nprn(2), ierr
   character*3 ii
   character*3 prn(maxsat, 2)
@@ -137,16 +137,18 @@ subroutine read_satclk(clkfil, iprn, jd, sod, jdc, sodc, x0, x1, iflag)
 10  continue
   if (jdf(1) .ne. jd .or. &
      (jdf(1) .eq. jdf(2) .and. sodf(1) .eq. sodf(2))) then
-    goto 202
+    ladvance = .true.
+  else
+    dt1 = timdif(jd, sod, jdf(1), sodf(1))
+    dt2 = timdif(jd, sod, jdf(2), sodf(2))
+    if (dt1 .lt. -MAXWND) then
+      write (*, '(a)') '***ERROR(read_satclk) : read_satclk t < trefclk '
+      iflag = 1
+      return
+    end if
+    ladvance = dt2 .gt. MAXWND
   end if
-  dt1 = timdif(jd, sod, jdf(1), sodf(1))
-  dt2 = timdif(jd, sod, jdf(2), sodf(2))
-  if (dt1 .lt. -MAXWND) then
-    write (*, '(a)') '***ERROR(read_satclk) : read_satclk t < trefclk '
-    iflag = 1
-    return
-  else if (dt2 .gt. MAXWND) then
-202 continue
+  if (ladvance) then
 !
 !! transfer clocks
     nprn(1) = nprn(2)

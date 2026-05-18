@@ -72,7 +72,8 @@ end
       IR = 1
       DO 5     N = 1,NMX2P
       DRTS(N) = DSQRT(N*1.D0)
-    5 DIRT(N) = 1.D0/DRTS(N)
+      DIRT(N) = 1.D0/DRTS(N)
+    5 CONTINUE
    10 COTHET = DCOS(THETA)
       SITHET = DSIN(THETA)
       IF(IFLAG.NE.1.AND.THETA.NE.0.D0)SITHI = 1.D0/SITHET
@@ -84,7 +85,8 @@ end
       DO 15    N1 = 3,M1
       N = N1-1
       N2 = 2*N
-   15 RLNN(N1) = DRTS(N2+1)*DIRT(N2)*SITHET*RLNN(N1-1)
+      RLNN(N1) = DRTS(N2+1)*DIRT(N2)*SITHET*RLNN(N1-1)
+   15 CONTINUE
       IF(M.GT.1) GO TO 20
       IF(M.EQ.0) GO TO 16
       RLEG(2) = RLNN(2)

@@ -70,7 +70,8 @@
       IGAP = N
 
       DO 1 I = 1,N
- 1    K(I) = I
+      K(I) = I
+ 1    CONTINUE
  5    IF(IGAP.LE.1) GO TO 25
 
       IGAP = IGAP/2

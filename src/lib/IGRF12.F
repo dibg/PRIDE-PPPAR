@@ -766,7 +766,7 @@ c
       p(3)  = st
       q(1)  = 0.0
       q(3)  =  ct
-      do 10 k=2,kmx                                                       
+      do 12 k=2,kmx                                                       
        if (n.ge.m) go to 4
        m     = 0
        n     = n + 1
@@ -811,6 +811,7 @@ c
        z     = z - (fn + 1.0)*one*p(k)
        l     = l + 1
    10 m     = m + 1
+   12 continue
 c
 c     conversion to coordinate system specified by itype
 c
