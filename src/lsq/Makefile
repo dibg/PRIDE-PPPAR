@@ -7,7 +7,7 @@ DIR_GUARD = @mkdir -p $(@D)
 BIN_PATH = ./
 OBJ_PATH = .obj/
 
-FFLAGS = -g -O3
+FFLAGS = -g -O3 -fno-tree-vectorize
 FTN = gfortran
 
 LIBCOM = ../lib/libcom.a

@@ -8,7 +8,7 @@ OBJ_PATH = .obj/
 
 # ASSIGMENTS
 FTN = gfortran 
-FFLAGS = -g -O3
+FFLAGS = -g -O3 -fno-tree-vectorize
 
 LIBCOM = ../lib/libcom.a  
 

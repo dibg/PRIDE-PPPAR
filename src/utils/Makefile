@@ -5,7 +5,7 @@ LIBCOM = ../lib/libcom.a
 
 # Flags
 FTN = gfortran 
-FFLAGS = -g -O3
+FFLAGS = -g -O3 -fno-tree-vectorize
 
 # Get all Fortran files in the current directory
 F90_FILES = $(wildcard *.f90)

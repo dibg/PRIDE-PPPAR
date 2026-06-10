@@ -9,7 +9,7 @@ OBJ_PATH = .obj/
 
 # Flags
 FTN = gfortran
-FFLAGS = -g -O3
+FFLAGS = -g -O3 -fno-tree-vectorize
 
 SRC := $(wildcard *.f90)
 SRC_FOR :=$(wildcard *.for)
