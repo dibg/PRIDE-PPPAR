@@ -393,11 +393,16 @@ else !% ibilinear interpolation
   indx(3) = (ipod  - 1)*360 + ilon1  !% along same polar distance
   indx(4) = (ipod1 - 1)*360 + ilon1  !% diagonal
 
+  !% final bounds check before the grid reads (issue #56): abort with a
+  !% diagnostic naming the offending corner index and input coordinate
+  !% instead of letting an out-of-range indx(l) segfault inside u().
+  !% Deliberately hoisted into its own loop ABOVE the interpolation loop:
+  !% an I/O+exit branch inside the interpolation loop stops gfortran -O3
+  !% from vectorizing its exp/** calls through libmvec, which changes
+  !% last-bit rounding of the results vs the stock build. Keeping the
+  !% interpolation loop body identical to upstream keeps the binary
+  !% bit-identical to upstream for valid input.
   do l = 1,4
-
-    !% final bounds check before the grid read (issue #56): abort with a
-    !% diagnostic naming the offending corner index and input coordinate
-    !% instead of letting an out-of-range indx(l) segfault inside u().
     if(indx(l).lt.1 .or. indx(l).gt.64800) then
       write(*,'(a,i2,a)') '***ERROR(gpt3_1): grid index out of range (ibilinear, corner ',l,')'
       write(*,'(a,i9,a,4i6,a,2f16.8)') &
@@ -405,6 +410,9 @@ else !% ibilinear interpolation
         '  dlat,dlon=',dlat,dlon
       call exit(1)
     endif
+  end do
+
+  do l = 1,4
 
     !% transforming ellipsoidal height to orthometric height:
     !% Hortho = -N + Hell
