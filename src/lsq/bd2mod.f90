@@ -68,6 +68,7 @@ subroutine bd2mod(jd, sod, LCF, SITE, OB, SAT, IM)
 ! function called
   real*8        dot
   real*8        bds_rng_cor ! correct bds pseudorange obs bias
+  integer*4     bds_system_class  ! BDS reconfiguration: system classification function
 
 !
 !! initial
@@ -163,7 +164,8 @@ subroutine bd2mod(jd, sod, LCF, SITE, OB, SAT, IM)
   do isat = 1, LCF%nprn
     if (LCF%prn(isat)(1:1) .ne. 'C') cycle
     read (LCF%prn(isat) (2:3), '(i2)') prn_int
-    if (prn_int .ge. 18) cycle
+!   BDS reconfiguration: only process BDS2 satellites (no satellites processed after reconfig)
+    if (bds_system_class(prn_int, jd, sod) /= 2) cycle
     if (OB%obs(isat, 1) .eq. 0.d0 .or. OB%obs(isat, 3) .eq. 0.d0 .or. .not. flag(isat)) cycle
 !
 !! get satellite clock information
@@ -345,7 +347,8 @@ subroutine bd2mod(jd, sod, LCF, SITE, OB, SAT, IM)
     do isat = 1, LCF%nprn
       if (LCF%prn(isat)(1:1) .ne. 'C') cycle
       read (LCF%prn(isat)(2:3), '(i2)') prn_int
-      if (prn_int .ge. 18) cycle
+!     BDS reconfiguration: use only BDS2 satellites for clock estimation
+      if (bds_system_class(prn_int, jd, sod) /= 2) cycle
       if (OB%omc(isat, 3) .ne. 0.d0) k = k + 1
       drecclk_tmp = drecclk_tmp + OB%omc(isat, 3)*freq(1)/VLIGHT
     end do

@@ -56,6 +56,8 @@ subroutine lsq_add_obs(lfncid, lfnobs, lfnrem, jd, sod, LCF, OB, PM, NM, SAT, SI
   real*8        f1(MAXSYS), f2(MAXSYS), rg(MAXSYS), r2(MAXSYS), g1(MAXSYS), lamw(MAXSYS)
   real*8        FREQ1_R(-50:50), FREQ2_R(-50:50)
   real*8        pco_sit_obs(2), pco_f1, pco_f2
+! function called
+  integer*4     bds_system_class  ! BDS reconfiguration: system classification function
 
   data lfirst/.true./
   save lfirst, f1, f2, rg, r2, g1, lamw
@@ -122,7 +124,8 @@ subroutine lsq_add_obs(lfncid, lfnobs, lfnrem, jd, sod, LCF, OB, PM, NM, SAT, SI
       if (LCF%prn(isat)(1:1) .eq. 'E') PM(ind)%iobs_E = PM(ind)%iobs_E + 1
       if (LCF%prn(isat)(1:1) .eq. 'C') then
         read (LCF%prn(isat) (2:3), '(i2)') prn_int
-        if (prn_int .le. 17) then
+!       BDS reconfiguration: determine counter based on system type
+        if (bds_system_class(prn_int, jd, sod) == 2) then
           PM(ind)%iobs_C = PM(ind)%iobs_C + 1
         else
           PM(ind)%iobs_3 = PM(ind)%iobs_3 + 1

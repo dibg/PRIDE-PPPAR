@@ -58,7 +58,7 @@ readonly USECACHE=YES
 readonly USERTS=YES
 
 readonly SCRIPT_NAME="pdp3"
-readonly VERSION_NUM="3.2.8"
+readonly VERSION_NUM="3.2.13"
 
 ######################################################################
 ##                     System-specific Command                      ##
@@ -124,11 +124,11 @@ main() {
 
     
     if [ "$OS" == "Darwin" ]; then
-        local doy_s=$(date -j -f "%Y-%m-%d" "$date_s" +"%j")
-        local doy_e=$(date -j -f "%Y-%m-%d" "$date_e" +"%j")
+        local doy_s=$(TZ=UTC date -j -f "%Y-%m-%d" "$date_s" +"%j")
+        local doy_e=$(TZ=UTC date -j -f "%Y-%m-%d" "$date_e" +"%j")
     else
-        local doy_s=$(date -d "$date_s" +"%j")
-        local doy_e=$(date -d "$date_e" +"%j")
+        local doy_s=$(TZ=UTC date -d "$date_s" +"%j")
+        local doy_e=$(TZ=UTC date -d "$date_e" +"%j")
     fi
     local ymd_s=($(echo "$date_s" | tr '-' ' '))
     local ymd_e=($(echo "$date_e" | tr '-' ' '))
@@ -189,7 +189,7 @@ ParseCmdArgs() { # purpose : parse command line into arguments
     local gnss_mask map_opt rckl rckp ztdl ztdp htgp eloff
     local mul_use=0
 	local wcc_use=0
-    local posp=0 twnd ts_set=0
+    local posp=0 twnd
 	# modified by ranzeng
     local ai_model
 
@@ -234,7 +234,6 @@ ParseCmdArgs() { # purpose : parse command line into arguments
                 ;;
             ## Time setting
             -s | --start )
-                ts_set=1
                 [ -z "$ymd_s" ] && [ -z "$hms_s" ]              || throw_conflict_opt "$1"
                 check_optional_arg "$2" "$last_arg"             || throw_require_arg  "$1"
                 local time=($(echo $2 | tr '/:-' ' '))
@@ -390,7 +389,7 @@ ParseCmdArgs() { # purpose : parse command line into arguments
                    [[ $(echo "$2 <= 1.00" | bc) -eq 1 ]]; then
                     twnd="$2" 
                 else
-                    throw_invalid_arg "cutoff elevation" "$2"
+                    throw_invalid_arg "time window" "$2"
                 fi
                 shift 1
                 ;;
@@ -617,7 +616,7 @@ ParseCmdArgs() { # purpose : parse command line into arguments
     fi
 
     # Create temporary config file
-    ctrl_file=$(mktemp -u | sed "s/tmp\./config\./")
+    ctrl_file=$(mktemp -u | sed 's#/tmp\.\([^/]*\)$#/config.\1#')
     cp -f "$ctrl_path" "$ctrl_file" && chmod 644 "$ctrl_file"
     if [ $? -ne 0 ]; then
         >&2 echo -e "$MSGERR failed to create temporary config file: $ctrl_file"
@@ -744,11 +743,11 @@ ParseCmdArgs() { # purpose : parse command line into arguments
         local mjd_s=$(ymd2mjd $(echo "${ymd_s[*]}" | tr '-' ' '))
         local mjd_e=$(ymd2mjd $(echo "${ymd_e[*]}" | tr '-' ' '))
         if [ "$OS" == "Darwin" ]; then
-            local doy_s=$(date -j -f "%Y-%m-%d" "$date_s" +"%j")
-            local doy_e=$(date -j -f "%Y-%m-%d" "$date_e" +"%j")
+            local doy_s=$(TZ=UTC date -j -f "%Y-%m-%d" "$date_s" +"%j")
+            local doy_e=$(TZ=UTC date -j -f "%Y-%m-%d" "$date_e" +"%j")
         else
-            local doy_s=$(date -d "${ymd_s[*]}" +"%j")
-            local doy_e=$(date -d "${ymd_e[*]}" +"%j")
+            local doy_s=$(TZ=UTC date -d "${ymd_s[*]}" +"%j")
+            local doy_e=$(TZ=UTC date -d "${ymd_e[*]}" +"%j")
         fi
 
         readonly local RNXO2D_GLOB="${rnxo_name:0:4}${doy_s}0.${ymd_s:2:2}@(o|O)"
@@ -873,42 +872,25 @@ ParseCmdArgs() { # purpose : parse command line into arguments
     [ -z "$twnd" ] && twnd=0.01
     sedi "/^Time window/s/ = .*/ = $twnd/" "$ctrl_file"
 
-    # Check interval setting and first epoch time
-    if [ "$ts_set" -eq 0 ] && [ "$(echo "$interval != $obsintvl" | bc)" -eq 1 ]; then
-        time_sec=$(grep -E "^(> [ 0-9]{4} [ 0-1][0-9] | [ 0-9][0-9] [ 0-1][0-9] )" "$rnxo_path")
-        local time=$(echo "$time_sec" | head -1)
-        while read -r line; do
-            local hour minute sec
-            if [[ $line =~ ^\> ]]; then
-                read -r _ _ _ _ hour minute sec _ <<< "$line"
-            else
-                read -r _ _ _ hour minute sec _ <<< "$line"
-            fi
-            total_seconds=$(echo "$hour * 3600 + $minute * 60 + $sec" | bc -l)
-            re=$(awk -v a="$total_seconds" -v b="$interval" 'BEGIN{q=int(a/b);r=a-q*b;print r}')
-            if [ "$(echo "$re < 0.001" | bc)" -eq 1 ]; then
-                time=$line
-                break
-            fi
-        done < <(echo "$time_sec")
-        if [ -n "$time" ]; then
-            if [[ $time =~ ^\> ]]; then
-                ymd_s=$(echo "$time" | awk '{printf("%04d-%02d-%02d\n",$2,$3,$4)}')
-                hms_s=$(echo "$time" | awk '{printf("%02d:%02d:%010.7f\n",$5,$6,$7)}')
-            else
-                ymd_s=$(echo "$time" | awk '{yr=$1+2000;if($1>80)yr-=100;printf("%04d-%02d-%02d\n",yr,$2,$3)}')
-                hms_s=$(echo "$time" | awk '{printf("%02d:%02d:%010.7f\n",$4,$5,$6)}')
-            fi
-        fi
-    fi
+    # Check interval setting and start epoch time
+    ts_sec=$(echo "$hms_s" | awk -F: '{print $1*3600 + $2*60 + $3}')
+    next_sec=$(awk -v ts="$ts_sec" -v b="$interval" 'BEGIN{
+        print int((ts + b - 1e-9)/b)*b
+    }')
+    hms_s=$(awk -v t="$next_sec" 'BEGIN{
+        h=int(t/3600)
+        m=int((t%3600)/60)
+        s=t%60
+        printf("%02d:%02d:%010.7f\n",h,m,s)
+    }')
 
     # Check time span
     if [ "$OS" == "Darwin" ]; then
-        local sec_s=$(date -j -f "%Y-%m-%d %H:%M:%S" "${ymd_s} ${hms_s%.*}" +"%s" | awk '{printf("%.3f", $1 + ("0." "'${hms_s#*.}'"))}')
-        local sec_e=$(date -j -f "%Y-%m-%d %H:%M:%S" "${ymd_e} ${hms_e%.*}" +"%s" | awk '{printf("%.3f", $1 + ("0." "'${hms_s#*.}'"))}')
+        local sec_s=$(TZ=UTC date -j -f "%Y-%m-%d %H:%M:%S" "${ymd_s} ${hms_s%.*}" +"%s" | awk '{printf("%.3f", $1 + ("0." "'${hms_s#*.}'"))}')
+        local sec_e=$(TZ=UTC date -j -f "%Y-%m-%d %H:%M:%S" "${ymd_e} ${hms_e%.*}" +"%s" | awk '{printf("%.3f", $1 + ("0." "'${hms_s#*.}'"))}')
     else
-        local sec_s=$(date -d "$ymd_s $hms_s" +"%s.%3N")
-        local sec_e=$(date -d "$ymd_e $hms_e" +"%s.%3N")
+        local sec_s=$(TZ=UTC date -d "$ymd_s $hms_s" +"%s.%3N")
+        local sec_e=$(TZ=UTC date -d "$ymd_e $hms_e" +"%s.%3N")
     fi
     local sspan=$(echo "$sec_e - $sec_s" | bc)
     if [[ $(echo "$sspan <= 0" | bc) -eq 1 ]]; then
@@ -1096,17 +1078,48 @@ ParseCmdArgs() { # purpose : parse command line into arguments
     sedi "/^Verbose output/s/ = .*/ = $vbs_opt/" "$ctrl_file"
 
     # GNSS
+    readonly local BDS_RECONFIG_MJD=61151
+    local session_mjd=$(ymd2mjd $(echo "$ymd_s" | tr '-' ' '))
+    local bds_reconfigured="NO"
+    [ "$session_mjd" -ge "$BDS_RECONFIG_MJD" ] && bds_reconfigured="YES"
+
+    if [ "$bds_reconfigured" == "YES" ] \
+        && [[ " ${avail_sys[*]} " == *" 2 "* ]] \
+        && [[ " ${avail_sys[*]} " != *" 3 "* ]]; then
+        >&2 echo -e "$MSGWAR no supported BDS-2 satellites are available for this session; processing stopped"
+        rm -f "$ctrl_file"
+        exit 1
+    fi
+
     for s in ${gnss_mask[@]}; do
         s=$(echo $s | tr 'a-z' 'A-Z')
         case $s in
-        "2" ) prn_mask=($(seq -f  "C%02g"  1 16)) ;;
-        "3" ) prn_mask=($(seq -f  "C%02g" 17 99)) ;;
+        "2" )
+            if [ "$bds_reconfigured" == "YES" ]; then
+                prn_mask=()
+            else
+                prn_mask=($(seq -f "C%02g" 1 16))
+            fi
+            ;;
+        "3" )
+            if [ "$bds_reconfigured" == "YES" ]; then
+                prn_mask=($(seq -f "C%02g" 1 99))
+            else
+                prn_mask=($(seq -f "C%02g" 17 99))
+            fi
+            ;;
          *  ) prn_mask=($(seq -f "$s%02g"  1 99)) ;;
         esac
         for prn in ${prn_mask[@]}; do
             sedi "/^ $prn /s/^ /#/" "$ctrl_file"
         done
     done
+
+    if [ "$bds_reconfigured" == "YES" ]; then
+        for prn in C09 C10; do
+            sedi "/^ $prn /s/^ /#/" "$ctrl_file"
+        done
+    fi
 
     # Disable ambiguity resolution when process with GLONASS only
     grep -q "^ [GECJ][0-9][0-9] " "$ctrl_file" || AR="N"
@@ -1461,11 +1474,11 @@ ProcessSingleSession() { # purpose : process data of a single observation sessio
     local rnxo_name=$(basename "$rnxo_path")
 
     if [ "$OS" == "Darwin" ]; then
-        local doy_s=$(date -j -f "%Y-%m-%d" "$date_s" +"%j")
-        local doy_e=$(date -j -f "%Y-%m-%d" "$date_e" +"%j")
+        local doy_s=$(TZ=UTC date -j -f "%Y-%m-%d" "$date_s" +"%j")
+        local doy_e=$(TZ=UTC date -j -f "%Y-%m-%d" "$date_e" +"%j")
     else
-        local doy_s=$(date -d "$ymd_s" +"%j")
-        local doy_e=$(date -d "$ymd_e" +"%j")
+        local doy_s=$(TZ=UTC date -d "$ymd_s" +"%j")
+        local doy_e=$(TZ=UTC date -d "$ymd_e" +"%j")
     fi
     local ymd_s=($(echo "$ymd_s" | tr '-' ' '))
     local ymd_e=($(echo "$ymd_e" | tr '-' ' '))
@@ -1828,7 +1841,7 @@ ProcessSingleSite() { # purpose : process data of single site
         fi
         cmd="redig res_${year}${doy} -jmp $jump -sht $short"
         [ "$positioning_mode" == "L" ] && cmd="$cmd -pce"
-        local time=`date +'%Y-%m-%d %H:%M:%S'`
+        local time=`TZ=UTC date +'%Y-%m-%d %H:%M:%S'`
         $cmd > tempout 2>&1
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}($time)${NC} ${CYAN}$cmd${NC} execution ok"
@@ -1854,7 +1867,7 @@ ProcessSingleSite() { # purpose : process data of single site
         ExecuteWithoutOutput "$cmd" || return 1
         cmd="redig res_${year}${doy} -jmp $jump_end -sht $short"
         [ "$positioning_mode" == "L" ] && cmd="$cmd -pce"
-        local time=`date +'%Y-%m-%d %H:%M:%S'`
+        local time=`TZ=UTC date +'%Y-%m-%d %H:%M:%S'`
         $cmd > tempout 2>&1
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}($time)${NC} ${CYAN}$cmd${NC} execution ok"
@@ -1988,6 +2001,7 @@ PrepareTables() { # purpose: prepare PRIDE-PPPAR needed tables in working direct
     local leapsec_ftp="0"
     local leapsec_exi="0"
     local leapsec_url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/table/$leapsec"
+	local leapsec_url_bds="ftps://bdspride.com/table/$leapsec"
     if [ -f "$leapsec" ]; then
         sed -n "1p;q" "$leapsec" | grep -q "*" || leapsec_ftp="1"
         grep -q "\-leap sec" "$leapsec"        || leapsec_ftp="1"
@@ -1996,7 +2010,7 @@ PrepareTables() { # purpose: prepare PRIDE-PPPAR needed tables in working direct
     fi
     if [ "$leapsec_ftp" != 0 -o "$leapsec_exi" != 0 ]; then
         rm -f "$leapsec"
-        WgetDownload "$leapsec_url"
+        WgetDownload "$leapsec_url_bds" || WgetDownload "$leapsec_url"
         if [ ! -f "$leapsec" ]; then
             cp -f "$table_dir/$leapsec" .
         else
@@ -2019,6 +2033,7 @@ PrepareTables() { # purpose: prepare PRIDE-PPPAR needed tables in working direct
     local satpara_ftp="0"
     local satpara_exi="0"
     local satpara_url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/table/$satpara"
+	local satpara_url_bds="ftps://bdspride.com/table/$satpara"
     if [ -f "$satpara" ]; then
         local tmpymd=($(sed -n "1p;q" "$satpara" | awk '{print(substr($0,56,4),substr($0,61,2),substr($0,64,2))}'))
         local tmpmjd=$(ymd2mjd ${tmpymd[@]})
@@ -2029,7 +2044,7 @@ PrepareTables() { # purpose: prepare PRIDE-PPPAR needed tables in working direct
     fi
     if [ "$satpara_ftp" != 0 -o "$satpara_exi" != 0 ]; then
         rm -f "$satpara"
-        WgetDownload "$satpara_url"
+        WgetDownload "$satpara_url_bds" || WgetDownload "$satpara_url"
         if [ ! -f "$satpara" ]; then
             cp -f "$table_dir/$satpara" .
         else
@@ -2073,7 +2088,7 @@ PrepareRinexNav() { # purpose : prepare RINEX multi-systems broadcast ephemeride
         local rinexnav="brdm${doy}0.${year:2:2}p"
 
         # Try downloading hourly navigation file when processing current day's data
-        if [ $(date -u +"%Y%j") -eq "$year$doy" ]; then
+        if [ $(TZ=UTC date -u +"%Y%j") -eq "$year$doy" ] && [ ! -f "$rinex_dir/$rinexnav" ]; then
             local navgps="hour${doy}0.${year:2:2}n" && rm -f "$navgps"
             local urlnav="ftp://igs.gnsswhu.cn/pub/gps/data/hourly/${year}/${doy}/${navgps}.gz"
             WgetDownload "$urlnav"
@@ -2339,7 +2354,7 @@ PrepareProducts() { # purpose : prepare PRIDE-PPPAR needed products in working d
             esac
             [ -f "$cmp" ] && gunzip -f "$cmp"
             if [ ! -f "$sp3" ]; then
-                local mjd_t=$(ymd2mjd $(date +"%Y %m %d"))
+                local mjd_t=$(ymd2mjd $(TZ=UTC date +"%Y %m %d"))
                 if [ $mjd_e -gt $(($mjd_t-3)) ] && [ "$USERTS" == "YES" ]; then
                     local url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${ydoy[0]}/orbit/WUM0MGXRTS_${ydoy[0]}${ydoy[1]}0000_01D_05M_ORB.SP3.gz"
                     local cmp=$(basename "$url")
@@ -2487,7 +2502,7 @@ PrepareProducts() { # purpose : prepare PRIDE-PPPAR needed products in working d
 			
             [ -f "$cmp" ] && gunzip -f "$cmp"
             if [ ! -f "$clk" ]; then
-                local mjd_t=$(ymd2mjd $(date +"%Y %m %d"))
+                local mjd_t=$(ymd2mjd $(TZ=UTC date +"%Y %m %d"))
                 if [ $mjd_e -gt $(($mjd_t-3)) ] && [ "$USERTS" == "YES" ]; then
                     local url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${ydoy[0]}/clock/WUM0MGXRTS_${ydoy[0]}${ydoy[1]}0000_01D_05S_CLK.CLK.gz"
                     local cmp=$(basename "$url")
@@ -2633,7 +2648,7 @@ PrepareProducts() { # purpose : prepare PRIDE-PPPAR needed products in working d
 			
             [ -f "$cmp" ] && gunzip -f "$cmp"
             if [ ! -f "$erp" ]; then
-                local mjd_t=$(ymd2mjd $(date +"%Y %m %d"))
+                local mjd_t=$(ymd2mjd $(TZ=UTC date +"%Y %m %d"))
                 if [ $mjd_e -gt $(($mjd_t-3)) ] && [ "$USERTS" == "YES" ]; then
                     local url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${ydoy[0]}/orbit/WUM0MGXRTS_${ydoy[0]}${ydoy[1]}0000_01D_01D_ERP.ERP.gz"
                     local cmp=$(basename "$url")
@@ -2919,7 +2934,7 @@ PrepareProducts() { # purpose : prepare PRIDE-PPPAR needed products in working d
 			
             [ -f "$cmp" ] && gunzip -f "$cmp"
             if [ ! -f "$fcb" ]; then
-                local mjd_t=$(ymd2mjd $(date +"%Y %m %d"))
+                local mjd_t=$(ymd2mjd $(TZ=UTC date +"%Y %m %d"))
                 if [ $mjd_e -gt $(($mjd_t-3)) ] && [ "$USERTS" == "YES" ]; then
                     local url="ftp://igs.gnsswhu.cn/pub/whu/phasebias/${ydoy[0]}/bias/WUM0MGXRTS_${ydoy[0]}${ydoy[1]}0000_01D_05M_OSB.BIA.gz"
                     local cmp=$(basename "$url")
@@ -3247,8 +3262,9 @@ PrepareProducts() { # purpose : prepare PRIDE-PPPAR needed products in working d
     fi
 
     echo -e "$MSGINF Prepare IGS ANTEX file: $abs_atx done"
+    [ "$mode" == "L" ] || CheckAntennaInAntex "$rinexobs" abs_igs.atx "$table_dir/$abs_atx"
 
-    # Position SINEX solution 
+    # Position SINEX solution
     if [ "$mode" == "F" ]; then
         [ "$OFFLINE" == "NO" ] && mkdir -p "$product_ssc_dir"
         local wkdow=($(mjd2wkdow $mjd_s))
@@ -3293,7 +3309,7 @@ PrepareProducts() { # purpose : prepare PRIDE-PPPAR needed products in working d
                 local ion_tmp="COD0OPSFIN_${ydoy[0]}${ydoy[1]}0000_01D_01H_GIM.INX"
                 local ion_cmp="${ion_tmp}.gz"
             fi
-            local ion_url="ftp://ftp.aiub.unibe.ch/CODE/${ydoy[0]}/${ion_cmp}"
+            local ion_url="https://www.aiub.unibe.ch/download/CODE/${ydoy[0]}/${ion_cmp}"
             CopyOrDownloadProduct "$product_ion_dir/$ion_tmp"
             if [ $? -ne 0 ]; then
                 CopyOrDownloadProduct "$product_ion_dir/$ion_cmp" "$ion_url"
@@ -3495,6 +3511,35 @@ CopyOrDownloadProduct() { # purpose : copy or download a product
     [ -f "$file" ] && return 0 || return 1
 }
 
+CheckAntennaInAntex() { # purpose : warn loudly when the receiver antenna of the RINEX file has no entry in the ANTEX file
+                        # usage   : CheckAntennaInAntex rinexobs atx_file hint_path
+                        # note    : rdatx applies a ZERO antenna model in that case (no PCO/PCV) and its own warning is
+                        #           discarded with the rest of the program output, so the height is biased silently
+    local rinexobs="$1"
+    local atx="$2"
+    local hint="$3"
+    local ant_type ant_none
+    ant_type="$(grep -m 1 "ANT # / TYPE" "$rinexobs" | cut -c 21-40)"
+    [ -n "${ant_type// /}" ] || return 0
+    if AntexHasAntenna "$atx" "$ant_type"; then
+        return 0
+    fi
+    ant_none="${ant_type:0:16}NONE"
+    if [ "$ant_none" != "$ant_type" ] && AntexHasAntenna "$atx" "$ant_none"; then
+        echo -e "$MSGWAR PrepareProducts: antenna \`$ant_type' not in ANTEX, the radome NONE entry \`$ant_none' will be used"
+        return 0
+    fi
+    echo -e "$MSGWAR PrepareProducts: antenna \`$ant_type' NOT FOUND in ANTEX file $atx"
+    echo -e "$MSGWAR PrepareProducts: a ZERO antenna model (no PCO/PCV) will be applied, which biases the height by centimetres"
+    echo -e "$MSGINF please check the antenna type in the RINEX header, or add its calibration (e.g. from NGS) to $hint"
+    return 0
+}
+
+AntexHasAntenna() { # purpose : test whether an ANTEX file holds an entry for a 20-character antenna type (with radome)
+                    # usage   : AntexHasAntenna atx_file ant_type
+    awk -v ant="$2" 'substr($0, 61, 16) == "TYPE / SERIAL NO" && substr($0, 1, 20) == ant { found = 1; exit } END { exit !found }' "$1"
+}
+
 WgetDownload() { # purpose : download a file with wget
                  # usage   : WgetDownload url
     local url="$1"
@@ -3563,7 +3608,7 @@ Execute() {
     if [ $# -gt 1 ]; then
         local outp="$2"
     fi
-    time=$(date +'%Y-%m-%d %H:%M:%S')
+    time=$(TZ=UTC date +'%Y-%m-%d %H:%M:%S')
     if [ $# -gt 1 ]; then
         echo "$cmd" | bash > "$outp"
     else
@@ -3582,7 +3627,7 @@ Execute() {
 
 ExecuteWithoutOutput() {
     local cmd="$1"
-    time=$(date +'%Y-%m-%d %H:%M:%S')
+    time=$(TZ=UTC date +'%Y-%m-%d %H:%M:%S')
     echo "$cmd" | bash &>/dev/null
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}($time)${NC} ${CYAN}$cmd${NC} execution ok"

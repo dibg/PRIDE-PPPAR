@@ -77,6 +77,8 @@ subroutine read_rinex_file(flnrnx, tstart, sstart, session_length, interval, &
   integer*4     iunit, iunit_next
   integer*4     prn_int
   integer*4     i0, ij, j, k
+! function called
+  integer*4     bds_system_class  ! BDS reconfiguration: system classification function
   integer*1     lli_thre
   real*8        lglimit, nwlimit, lglimit_t
   character*3   jj
@@ -215,17 +217,19 @@ subroutine read_rinex_file(flnrnx, tstart, sstart, session_length, interval, &
         if  (index(GNSS_SYS, '2') > 0 .and. index(GNSS_SYS, '3') > 0 ) then
           continue
         else if  (index(GNSS_SYS, '2') > 0) then
-          if (j .gt. 17) then
+!         BDS reconfiguration: keep only BDS2 satellites based on date
+          if (bds_system_class(j, jd0, 43200) /= 2) then
             OB%prn(ichn)=" "
             continue
-          end if 
+          end if
         else if  (index(GNSS_SYS, '3') > 0) then
-          if (j .le. 17) then
+!         BDS reconfiguration: keep only BDS3 satellites based on date
+          if (bds_system_class(j, jd0, 43200) /= 3) then
             OB%prn(ichn)=" "
             continue
-          end if 
+          end if
         else
-          OB%prn(ichn)=" "  
+          OB%prn(ichn)=" "
           continue
         end if
       else

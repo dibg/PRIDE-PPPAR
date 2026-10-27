@@ -67,6 +67,7 @@ subroutine get_lsq_args(LCF, SITE, OB, SAT, IM)
   integer*4     modified_julday
   integer*4     pointer_string
   integer*4     day_of_year
+  integer*4     bds_system_class    ! BDS reconfiguration: system classification function
   real*8        timdif
   character*256 findkey, lower_string
   character*4   upper_string
@@ -226,6 +227,11 @@ subroutine get_lsq_args(LCF, SITE, OB, SAT, IM)
   LCF%lrmbias = .true.
   if (key(1:1) .eq. 'Y') LCF%lrmbias = .false.
 !
+!! Match arsig's validation switch for the result headers.
+  msg = 'AI Ambiguity validation'
+  key = findkey(lfn, msg, ' ')
+  LCF%lambxgb = index(key, 'YES') .ne. 0
+!
 !! Ambiguity constraints
   LCF%nconG  = 0
   LCF%nconE  = 0
@@ -357,7 +363,8 @@ subroutine get_lsq_args(LCF, SITE, OB, SAT, IM)
     tmpsys = iprn(1:1)
     if (tmpsys .eq. 'C') then
       read (iprn(2:3), '(i2)') l
-      if (l .gt. 17) tmpsys = '3'
+!     BDS reconfiguration: determine BDS2/BDS3 based on date (2026-04-21)
+      if (bds_system_class(l, LCF%jd0, LCF%sod0) == 3) tmpsys = '3'
     end if
     if (index(LCF%sys, tmpsys) .eq. 0) then
       LCF%sys = LCF%sys(1:len_trim(LCF%sys))//tmpsys

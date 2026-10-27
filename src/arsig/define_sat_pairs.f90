@@ -39,9 +39,11 @@ subroutine define_sat_pairs(ACF, AS, ASD)
 !! local
   integer*4 j, k, isat, jsat, im, in, is
   integer*4 iprn_int,jprn_int
+  integer*4 jd_mid             ! BDS reconfiguration: session midpoint date
 !
 !! function used
   integer*4 pointer_int, pointer_string
+  integer*4 bds_system_class  ! BDS reconfiguration: system classification function
 
   AS%nsd   = 0
   AS%nsd_G = 0
@@ -51,6 +53,9 @@ subroutine define_sat_pairs(ACF, AS, ASD)
   AS%nsd_3 = 0
   AS%nsd_J = 0
 
+! BDS reconfiguration: compute session midpoint date for BDS2/BDS3 determination
+  jd_mid = (ACF%jd0 + ACF%jd1) / 2
+
   do im=1,AS%now-1
     if(pointer_string(ACF%fcbnprn, ACF%fcbprn, ACF%prn(AS%isat(im))) .eq. 0) cycle
     do in=im+1,AS%now
@@ -59,7 +64,8 @@ subroutine define_sat_pairs(ACF, AS, ASD)
       if(ACF%prn(AS%isat(im))(1:1).eq.'C') then
         read(ACF%prn(AS%isat(im))(2:3),'(i2)') j
         read(ACF%prn(AS%isat(in))(2:3),'(i2)') k
-        if(j.lt.18.and.k.gt.18.or.j.gt.18.and.k.lt.18) cycle
+!       BDS reconfiguration: avoid BDS2/BDS3 pairing using helper function
+        if (bds_system_class(j, jd_mid, 43200) /= bds_system_class(k, jd_mid, 43200)) cycle
       endif
       j = max(AS%iepc(1, im), AS%iepc(1, in))
       k = min(AS%iepc(2, im), AS%iepc(2, in))
@@ -83,7 +89,8 @@ subroutine define_sat_pairs(ACF, AS, ASD)
         if(ASD(AS%nsd)%sys.eq.'J') AS%nsd_J = AS%nsd_J+1
       else
         read(ACF%prn(AS%isat(im))(2:3),'(i2)') j
-        if(j.lt.18) then
+!       BDS reconfiguration: determine system type using helper function
+        if (bds_system_class(j, jd_mid, 43200) == 2) then
           ASD(AS%nsd)%sys = 'C'
           AS%nsd_C = AS%nsd_C+1
         else

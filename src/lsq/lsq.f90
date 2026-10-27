@@ -65,7 +65,8 @@ program lsq
   integer*4     nbias_used(MAXSAT)
   integer*4     nbias, ibias(MAXPAR)
   integer*4     index_g(2), index_r(2), index_e(2), index_c(2), index_3(2), index_j(2)
-  real*8        freq, dwnd, sod, sec, sodc, deltax(3), pdop, pdop_sum, nbb(4, 4) 
+  integer*4     jd_mid             ! BDS reconfiguration: session midpoint date
+  real*8        freq, dwnd, sod, sec, sodc, deltax(3), pdop, pdop_sum, nbb(4, 4)
   character*3   temprn
   character*20  antnum
 !! GLONASS
@@ -75,6 +76,7 @@ program lsq
 !! function called
   integer*4     get_valid_unit
   integer*4     pointer_string
+  integer*4     bds_system_class    ! BDS reconfiguration: system classification function
   real*8        timdif
   character*10  run_tim
 !
@@ -96,6 +98,8 @@ program lsq
   index_c = 0
   index_3 = 0
   index_j = 0
+! BDS reconfiguration: use session midpoint date to determine BDS2/BDS3
+  jd_mid = (LCF%jd0 + LCF%jd1) / 2
   do i = 1, LCF%nprn
     if (LCF%prn(i)(1:1) .eq. 'G') then
       if (index_g(1) .eq. 0) index_g(1) = i
@@ -111,11 +115,11 @@ program lsq
     end if
     if (LCF%prn(i)(1:1) .eq. 'C') then
       read (LCF%prn(i) (2:3), '(i2)') j
-      if (j .le. 17) then
+!     BDS reconfiguration: determine system type based on date
+      if (bds_system_class(j, jd_mid, 43200) == 2) then
         if (index_c(1) .eq. 0) index_c(1) = i
         index_c(2) = i
-      end if
-      if (j .gt. 17) then
+      else
         if (index_3(1) .eq. 0) index_3(1) = i
         index_3(2) = i
       end if

@@ -1,6 +1,6 @@
 ![pridelab.icon](https://github.com/PrideLab/PRIDE-PPPAR/blob/master/doc/PRIDE.png)
 
-## PRIDE-PPPAR ver. 3.2.8 (last updated on 2026-05-13)
+## PRIDE-PPPAR ver. 3.2.13 (last updated on 2026-10-23)
 
 PRIDE PPP-AR originates in Dr. Maorong Ge’s efforts on PPP-AR and later developed and improved by Dr. Jianghui Geng's team. It is an open-source software package which is based on many GNSS professionals’ collective work in GNSS Research Center, Wuhan University. We would like to thank them all for their brilliant contributions to this software. 
 
@@ -67,8 +67,34 @@ The improvements made in PRIDE PPP-AR version 3.2 include:
 
 See our [Change Log](https://github.com/PrideLab/PRIDE-PPPAR/blob/master/CHANGELOG.md) for detailed update history before version 3.2.
 
+### 2026-10-23 (v3.2.13)
+* `lib`: Fix a problem on calculating high-order ionospheric corrections
+
+### 2026-10-12 (v3.2.12)
+* `lib` : Update the function 'read_satclk' to fix a problem on multi-day processing
+* `pdp3`: Update the command line creating temporary config file to make it more compatible with some special case
+* `merge2brdm`: Make it more compatible with some non-standard broadcast file
+* `lsq`: Update the header of solution files
+* `example`: Add the reference result of AI-based ambiguity validation
+
+
+### 2026-09-24 (v3.2.11)
+* `pdp3`: Fix a problem on specifying BDS constellation after the BDS reconfiguration
+* `gui` : Fix a problem on reading RINEX observations
+* `lib` : Ensure compatibility with the new version of DOCB products
+
+### 2026-08-07 (v3.2.10)
+* `install.sh`: Fix a problem concerning Python-shebang sed crashes on macOS (BSD sed)
+* `lsq` & `tedit` & `lib` & `arsig` : Accommodate the BDS reconfiguration
+
+### 2026-06-12 (v3.2.9)
+* `pdp3`: Fix a problem with respect to pre-staged broadcast nav on same-day runs
+* `pdp3`: Fix GNU date calls for users in timezones with daylight savings
+* `lib`: Avoid processing errors caused by NaN values in the input SINEX bias file
+* `script`: Add a new python script that converts the output kinematic file to csv
+
 ### 2026-05-13 (v3.2.8)
-* `pdp3`: Fix a problem with specifying the process start time
+* `pdp3`: Fix a problem on specifying the process start time
 
 ### 2026-04-12 (v3.2.7)
 * `spp`: Fix a problem when compiling with Fortran (90/95/2003+)
@@ -78,20 +104,20 @@ See our [Change Log](https://github.com/PrideLab/PRIDE-PPPAR/blob/master/CHANGEL
 
 ### 2026-03-07 (v3.2.5)
 * `pdp3`: Extend the threshold in check a priori position
-* `lib`: Fix a problem in read rinex observations
+* `lib`: Fix a problem on reading rinex observations
 
 ### 2026-02-11 (v3.2.4)
 * `gui`: Update the product download address in windows version
 
 ### 2026-01-15 (v3.2.3)
-* `pdp3`: Fix a problem in identifying the first epoch to process
+* `pdp3`: Fix a problem on identifying the first epoch to process
 * `tedit`: Fix a output problem
 
 ### 2025-12-15 (v3.2.2)
-* `pdp3`: Fix a problem in across-day processing with DOCB products
+* `pdp3`: Fix a problem on across-day processing with DOCB products
 
 ### 2025-11-10 (v3.2.1)
-* `tedit`: Fix a problem in multi-day data processing
+* `tedit`: Fix a problem on multi-day data processing
 * `read_igserp`: Fix a problem in read ERP file
 * `install.sh`: Remove the IGN download address
 

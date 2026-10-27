@@ -49,6 +49,8 @@ subroutine lsq_init(LCF, SITE, OB, NM, PM)
   character*2 htg, tmpsys
   character*6 sys
   real*8 val
+! function called
+  integer*4     bds_system_class  ! BDS reconfiguration: system classification function
 
   data xyz, htg, sys/'XYZ', 'CS', 'GREC3J'/
 !
@@ -185,7 +187,8 @@ subroutine lsq_init(LCF, SITE, OB, NM, PM)
           tmpsys(1:1) = LCF%prn(isat) (1:1)
           if (LCF%prn(isat) (1:1) .eq. 'C') then
             read (LCF%prn(isat) (2:3), '(i2)') k
-            if (k .gt. 17) tmpsys(1:1) = '3'
+!           BDS reconfiguration: determine system type based on date
+            if (bds_system_class(k, LCF%jd0, LCF%sod0) == 3) tmpsys(1:1) = '3'
           endif
           if (tmpsys(1:1) .eq. sys(i:i)) then
             OB%ltog(OB%npar, isat) = ipar
@@ -212,10 +215,12 @@ subroutine lsq_init(LCF, SITE, OB, NM, PM)
           if (LCF%prn(isat) (1:1) .eq. 'C') then
             if (sys(i:i) .eq. 'C') then
               read (LCF%prn(isat) (2:3), '(i2)') k
-              if (k .le. 17) OB%ltog(OB%npar, isat) = ipar
+!             BDS reconfiguration: BDS2 ISB only for BDS2 satellites
+              if (bds_system_class(k, LCF%jd0, LCF%sod0) == 2) OB%ltog(OB%npar, isat) = ipar
             else if (sys(i:i) .eq. '3') then
               read (LCF%prn(isat)(2:3), '(i2)') k
-              if (k .gt. 17) OB%ltog(OB%npar, isat) = ipar
+!             BDS reconfiguration: BDS3 ISB only for BDS3 satellites
+              if (bds_system_class(k, LCF%jd0, LCF%sod0) == 3) OB%ltog(OB%npar, isat) = ipar
             end if
             cycle
           end if

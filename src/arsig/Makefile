@@ -11,6 +11,11 @@ OBJ_PATH = .obj/
 FTN = gfortran
 FFLAGS = -g -O0 -fno-tree-vectorize
 CFLAGS = -std=c99
+# Apple clang caps C bracket nesting at 256; the generated xgb_model.c exceeds it.
+# GNU gcc has no such limit and rejects -fbracket-depth, so add it for clang only.
+ifneq (,$(findstring clang,$(shell gcc --version 2>/dev/null)))
+  CFLAGS += -fbracket-depth=1024
+endif
 
 LIBCOM = ../lib/libcom.a
 
@@ -33,7 +38,7 @@ $(OBJ_PATH)%.o : %.f90
 	
 $(OBJ_PATH)%.o : %.c
 	$(DIR_GUARD)
-	gcc $(CFLAGS) -c $< -o $@
+	ulimit -s $$(ulimit -Hs) 2>/dev/null || true; gcc $(CFLAGS) -c $< -o $@
 
 
  

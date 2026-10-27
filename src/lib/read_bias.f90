@@ -100,14 +100,9 @@ subroutine read_bias(flnosb, nprn, prn, bias, osbjd0, osbjd1)
         jd1 = modified_julday(id1, imon1, iyear1)
         if (jd1 + isod1/864.d2 .le. osbjd0 .or. jd0 + isod0/864.d2 .ge. osbjd1) cycle
         read (line, '(70x,f21.15)') osbval
-        !! skip records carrying a non-finite bias value -- some analysis-centre
-        !! OSB products write a literal "NaN" for unestimated biases, which
-        !! would otherwise propagate into the normal equations and produce a
-        !! NaN station position
-        if (osbval /= osbval) goto 50
+        !! skip records carrying a non-finite bias value 
+        if ((osbval .ne. osbval) .or. (abs(osbval) .ge. 1.0d9)) goto 50
         !! a valid slope is only present on long records; absent or non-finite,
-        !! leave %grd at its 1.d9 sentinel (osbgrd was previously used here
-        !! uninitialised when the line was short)
         lhasgrd = .false.
         if (len_trim(line) .gt. 124) then
           read (line, '(104x,f21.15)') osbgrd
